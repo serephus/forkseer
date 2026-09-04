@@ -67,6 +67,7 @@ A token gives GitHub API requests a higher rate limit. The token should have per
 - `--concurrency <N>`: scan this many repositories concurrently. The default is `8`.
 - `--rate-limit <N>`: limit GitHub API requests per second across the whole process. The default is `4`.
 - `--json`: print machine-readable JSON output.
+- `-v`, `--verbose`: print scan progress and diagnostic information to stderr.
 - `--token <TOKEN>`: use a GitHub token. This also reads `GITHUB_TOKEN`.
 - `--include-root`: include the source repository in the search.
 
@@ -85,6 +86,8 @@ owner/example [main]
   https://github.com/owner/example
   - src/example.rs
 ```
+
+Use `--verbose` to print progress, branch checks, and a final summary to stderr. This also works with `--json` without corrupting the JSON on stdout.
 
 Use `--json` for output suitable for scripts:
 

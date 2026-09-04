@@ -35,6 +35,10 @@ struct Cli {
     #[arg(long)]
     json: bool,
 
+    /// Print progress and diagnostic information to stderr.
+    #[arg(short, long)]
+    verbose: bool,
+
     /// GitHub token.
     #[arg(long)]
     token: Option<String>,
@@ -91,6 +95,10 @@ async fn main() -> Result<()> {
     let limiter = RateLimiter::new(cli.rate_limit)?;
     let (owner, repo) = parse_repo(&cli.repo)?;
 
+    if cli.verbose {
+        eprintln!("inspecting {}/{} for {}", owner, repo, target_path);
+    }
+
     let mut builder = Octocrab::builder();
     if let Some(token) = cli.token.as_deref() {
         builder = builder.personal_token(token.to_owned());
@@ -113,20 +121,37 @@ async fn main() -> Result<()> {
     let limit = cli.limit.unwrap_or(repos.len());
     repos.truncate(limit);
 
+    if cli.verbose {
+        eprintln!(
+            "found {} repositories to scan ({} source branches, concurrency {})",
+            repos.len(),
+            origin_branches.len(),
+            cli.concurrency.max(1)
+        );
+    }
+
     let concurrency = cli.concurrency.max(1);
-    let results =
-        stream::iter(repos.into_iter().map(|repository| {
-            let crab = crab.clone();
-            let limiter = limiter.clone();
-            let target_path = target_path.clone();
-            let origin_branches = origin_branches.clone();
-            async move {
-                scan_repository(&crab, &limiter, repository, &target_path, &origin_branches).await
-            }
-        }))
-        .buffer_unordered(concurrency)
-        .collect::<Vec<_>>()
-        .await;
+    let verbose = cli.verbose;
+    let results = stream::iter(repos.into_iter().map(|repository| {
+        let crab = crab.clone();
+        let limiter = limiter.clone();
+        let target_path = target_path.clone();
+        let origin_branches = origin_branches.clone();
+        async move {
+            scan_repository(
+                &crab,
+                &limiter,
+                repository,
+                &target_path,
+                &origin_branches,
+                verbose,
+            )
+            .await
+        }
+    }))
+    .buffer_unordered(concurrency)
+    .collect::<Vec<_>>()
+    .await;
 
     let mut matched = Vec::new();
     let mut failures = Vec::new();
@@ -136,6 +161,14 @@ async fn main() -> Result<()> {
             Ok(repo_matches) => matched.extend(repo_matches),
             Err(err) => failures.push(err.to_string()),
         }
+    }
+
+    if cli.verbose {
+        eprintln!(
+            "scan complete: {} matches, {} failures",
+            matched.len(),
+            failures.len()
+        );
     }
 
     render_output(cli.json, &matched, &failures)?;
@@ -248,6 +281,7 @@ async fn scan_repository(
     repository: Repository,
     target_path: &str,
     origin_branches: &std::collections::HashSet<String>,
+    verbose: bool,
 ) -> Result<Vec<RepoMatch>> {
     let full_name = repository
         .full_name
@@ -264,6 +298,10 @@ async fn scan_repository(
         .unwrap_or_else(|| "HEAD".to_string());
     let (owner, repo) = parse_repo(&full_name)?;
 
+    if verbose {
+        eprintln!("scanning {full_name}");
+    }
+
     let fork_branches = list_branches(crab, limiter, owner, repo).await?;
     let mut branches = vec![default_branch.clone()];
     branches.extend(
@@ -272,14 +310,26 @@ async fn scan_repository(
             .filter(|branch| !origin_branches.contains(branch) && branch != &default_branch),
     );
 
+    if verbose {
+        eprintln!("  checking {} branches", branches.len());
+    }
+
     let mut matches = Vec::new();
     for branch in branches {
-        if content_exists(crab, limiter, owner, repo, &branch, target_path)
+        let exists = content_exists(crab, limiter, owner, repo, &branch, target_path)
             .await
             .with_context(|| {
                 format!("failed to fetch content for {full_name}:{branch}:{target_path}")
-            })?
-        {
+            })?;
+        if verbose {
+            eprintln!(
+                "  {}:{} -> {}",
+                full_name,
+                branch,
+                if exists { "found" } else { "missing" }
+            );
+        }
+        if exists {
             matches.push(RepoMatch {
                 full_name: full_name.clone(),
                 branch,
@@ -287,6 +337,10 @@ async fn scan_repository(
                 path: target_path.to_string(),
             });
         }
+    }
+
+    if verbose {
+        eprintln!("finished {full_name}: {} matches", matches.len());
     }
 
     Ok(matches)
