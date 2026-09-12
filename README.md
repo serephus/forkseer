@@ -52,13 +52,6 @@ Provide a GitHub token with `--token`:
 forkseer --token "$GITHUB_TOKEN" rust-lang/rust src/bootstrap/config.rs
 ```
 
-Or set the `GITHUB_TOKEN` environment variable:
-
-```sh
-export GITHUB_TOKEN=your-token
-forkseer rust-lang/rust src/bootstrap/config.rs
-```
-
 A token gives GitHub API requests a higher rate limit. The token should have permission to read the repositories being searched.
 
 ## Options
