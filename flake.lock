@@ -61,6 +61,35 @@
         "type": "github"
       }
     },
+    "nixit": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "naersk": [
+          "naersk"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rust-overlay": [
+          "rust-overlay"
+        ]
+      },
+      "locked": {
+        "lastModified": 1795185125,
+        "narHash": "sha256-FqMXMYQUF3z8j++cuQ4LB0lh49S+GmTVA+rVRDIejFA=",
+        "owner": "serephus",
+        "repo": "nixit",
+        "rev": "365863a5c68b58014cedc2a521df41c63816abca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "serephus",
+        "repo": "nixit",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1795249095,
@@ -81,6 +110,7 @@
       "inputs": {
         "flake-utils": "flake-utils",
         "naersk": "naersk",
+        "nixit": "nixit",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay"
       }

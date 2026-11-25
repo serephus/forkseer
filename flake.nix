@@ -10,17 +10,94 @@
       url = "github:nix-community/naersk";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nixit = {
+      url = "github:serephus/nixit";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
+      inputs.rust-overlay.follows = "rust-overlay";
+      inputs.naersk.follows = "naersk";
+    };
   };
 
   outputs =
     {
       nixpkgs,
       flake-utils,
+      nixit,
       rust-overlay,
       naersk,
       ...
     }:
-    flake-utils.lib.eachDefaultSystem (
+    {
+      githubRepositories.forkseer = nixit.lib.githubRepository {
+        owner = "serephus";
+        name = "forkseer";
+
+        description = "Search for a specific file (e.g. flake.nix) in the forks of a GitHub repository.";
+        homepage = "https://github.com/serephus/forkseer";
+        topics = [
+          "github"
+          "nix"
+          "rust"
+        ];
+        visibility = "public";
+
+        features = {
+          wiki.enable = false;
+          issues.enable = true;
+          projects.enable = false;
+          discussions.enable = false;
+        };
+
+        is_template = false;
+        is_archived = false;
+
+        pull = {
+          merge.enable = true;
+          squash.enable = false;
+          rebase.enable = false;
+          auto_merge = true;
+          delete_branch_on_merge = true;
+          update_branch = true;
+        };
+
+        actions = {
+          enable = true;
+          policy = "all";
+          default_token_permissions = "read";
+          allow_pr_approval = false;
+        };
+
+        rulesets = {
+          default = {
+            enforcement = "active";
+            conditions.ref_name.include = [ "~DEFAULT_BRANCH" ];
+            rules = [
+              { type = "deletion"; }
+              { type = "non_fast_forward"; }
+            ];
+          };
+          pr = {
+            enforcement = "active";
+            conditions.ref_name.include = [ "~DEFAULT_BRANCH" ];
+            rules = [
+              {
+                type = "required_status_checks";
+                parameters = {
+                  strict_required_status_checks_policy = true;
+                  required_status_checks = [
+                    { "context" = "ubuntu-latest-x86_64-unknown-linux-gnu-nightly"; }
+                    { "context" = "ubuntu-latest-x86_64-unknown-linux-gnu-stable"; }
+                    { "context" = "Nix Build"; }
+                  ];
+                };
+              }
+            ];
+          };
+        };
+      };
+    }
+    // flake-utils.lib.eachDefaultSystem (
       system:
       let
         overlays = [ (import rust-overlay) ];
@@ -43,6 +120,7 @@
           forkseer = naersk'.buildPackage ./.;
         };
         devShell = pkgs.mkShell {
+          name = "forkseer";
           buildInputs = [
             rust
             pkgs.nixd
